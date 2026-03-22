@@ -1,10 +1,10 @@
 clc; clear; close all;
 
-%% ================= CONSTANTS =================
+%%  CONSTANTS
 Re  = 6371;                 % Earth radius (km)
 mu  = 398600;               % Earth GM (km^3/s^2)
 
-%% ================= USER PARAMETERS =================
+%% INTERCEPTION PARAMETERS
 Nmc        = 40;
 dt         = 1.0;
 Tmax       = 4200;
@@ -15,26 +15,24 @@ Npn        = 4;
 
 launch_ECI = [Re; 0];
 
-%% ================= STORAGE =================
 success = 0;
 miss_all = NaN(Nmc,1);
 ICBM_paths = cell(Nmc,1);
 INT_paths  = cell(Nmc,1);
 
-%% ================= MONTE CARLO =================
 for mc = 1:Nmc
 
-    %% ---- ICBM INITIAL POSITION (SCATTERED) ----
+    %%  ICBM INITIAL POSITION (SCATTERED) 
     r0 = [Re+7000+500*randn; 6000+500*randn];
 
-    %% ---- LAMBERT TARGETING (STRICT) ----
+    %%  LAMBERT TARGETING (STRICT) 
     Timpact = 3600 + 300*randn;     % seconds
     [v0, ~] = lambert2D(r0, launch_ECI, Timpact, mu);
 
     rT = r0;
     vT = v0;
 
-    %% ---- INTERCEPTOR ----
+    %%  INTERCEPTOR 
     rI = launch_ECI;
     vI_mag = 9.8;
     vI = [0;0];
@@ -43,7 +41,7 @@ for mc = 1:Nmc
     rT_hist = [];
     rI_hist = [];
 
-    %% ---- TIME LOOP ----
+    %%  TIME loop
     for t = 0:dt:Tmax
 
         %% === TRUE 2‑BODY ICBM ===
@@ -62,13 +60,13 @@ for mc = 1:Nmc
         Rrel = norm(r_rel);
         v_rel = vT - vI;
 
-        %% === LAUNCH GATE ===
+        %%  LAUNCH gate
         if ~launched && alt > h_reentry && Rrel < Rmax_I
             launched = true;
             vI = vI_mag * r_rel/Rrel;
         end
 
-        %% === PN GUIDANCE ===
+        %%  PN guidance 
         if launched
             lambda_dot = (r_rel(1)*v_rel(2) - r_rel(2)*v_rel(1))/(Rrel^2);
             Vc = -dot(r_rel,v_rel)/Rrel;
@@ -82,29 +80,29 @@ for mc = 1:Nmc
         end
         rI_hist(:,end+1) = rI;
 
-        %% === INTERCEPT ===
+        %%  INTERCEPT 
         if launched && Rrel < hit_radius
             success = success + 1;
             break
         end
     end
 
-    %% === MISS DISTANCE ===
+    %%  MISS DISTANCE 
     L = min(size(rT_hist,2),size(rI_hist,2));
     miss_all(mc) = min(vecnorm(rT_hist(:,1:L) - rI_hist(:,1:L)));
 
-    %% === LOCAL TANGENT FRAME ===
+    %%  LOCAL TANGENT FRAME 
     ICBM_paths{mc} = rT_hist - launch_ECI;
     INT_paths{mc}  = rI_hist - launch_ECI;
 end
 
-%% ================= STATS =================
+%%  STATS 
 fprintf('\nENGAGEMENT STATISTICS ===\n');
 fprintf('POI                : %.2f\n',success/Nmc);
 fprintf('Mean miss distance : %.2f km\n',mean(miss_all,'omitnan'));
 fprintf('Min miss distance  : %.2f km\n',min(miss_all,[],'omitnan'));
 
-%% ================= PLOT =================
+%%  PLOT 
 figure; hold on; grid on; axis equal;
 for i = 1:Nmc
     plot(ICBM_paths{i}(1,:),ICBM_paths{i}(2,:),'b','Color',[0.2 0.4 1 0.3]);
